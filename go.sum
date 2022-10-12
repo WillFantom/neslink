@@ -32,6 +32,8 @@ github.com/willfantom/nescript v0.3.0 h1:BmADyoUGUrA2TTLI00xCQ0OxKncB0m9XqETRzua
 github.com/willfantom/nescript v0.3.0/go.mod h1:hyIouQSPdfQSK+VxfFTdXdwkm+aJpJv5t1Sh7/I6B+4=
 github.com/willfantom/nescript v0.4.0 h1:hhBrUbgVLpEpW2wkXxJbyLWarMlNfNH7JDoFQWKZF0Q=
 github.com/willfantom/nescript v0.4.0/go.mod h1:apezinl8hIr4tjE0eF/a40rLAWSSiZdnDKaQbyldl6s=
+github.com/willfantom/nescript v0.5.0 h1:iJi65p3V1bMnBZsnelnFQRgV2JlU7eRlI8tjLRbjbZY=
+github.com/willfantom/nescript v0.5.0/go.mod h1:apezinl8hIr4tjE0eF/a40rLAWSSiZdnDKaQbyldl6s=
 golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444 h1:/d2cWp6PSamH4jDPFLyO150psQdqvtoNX8Zjg3AQ31g=
 golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190626150813-e07cf5db2756/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
