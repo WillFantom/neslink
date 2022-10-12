@@ -1,5 +1,5 @@
-# ~~net~~**nes**link
-<!-- TODO: add go reference badge -->
+# ~~net~~**nes**link    ![GitHub release (latest SemVer)](https://img.shields.io/github/v/tag/willfantom/neslink?display_name=tag&label=%20&sort=semver)
+[![Go Reference](https://pkg.go.dev/badge/github.com/willfantom/neslink.svg)](https://pkg.go.dev/github.com/willfantom/neslink)
 
 NESlink is go package that allows for interaction with netlink. NESlink is simply a quality of life wrapper around these great [netlink](https://github.com/vishvananda/netlink) and [netns](https://github.com/vishvananda/netns) packages. Not all the functionality of these packages remains in NESlink, but the interactions that are included are better suited to the [NES]() platform implementation.
 
