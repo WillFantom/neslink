@@ -42,6 +42,7 @@ func NsDo(nsP NsProvider, actions ...NsAction) (error, bool) {
 		for idx, action := range nsActions {
 			if err := action.f(); err != nil {
 				errChan <- fmt.Errorf("failed to perform ns action %d (%s): %w", idx+1, action.actionName, err)
+				return
 			}
 		}
 		errChan <- nil
