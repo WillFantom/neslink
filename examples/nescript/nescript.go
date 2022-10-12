@@ -14,7 +14,7 @@ func main() {
 	// 2. create an empty process to store the newly created process in
 	process := *new(nescript.Process)
 
-	// 3. execute the script via the approriate ns action in an nsdo call
+	// 3. execute the script via the appropriate ns action in an nsdo call
 	err := neslink.MustNsDo(neslink.NPNew(), neslink.NAExecNescript(script, nil, &process))
 	if err != nil {
 		panic(err)
