@@ -1,32 +1,35 @@
 package neslink
 
-// TODO: Support more new link types (Dummy, GRETap, Wireguard, VxLan)
+import (
+	"fmt"
+	"net"
 
-import "github.com/vishvananda/netlink"
+	"github.com/vishvananda/netlink"
+)
 
 type LinkProvider func() (netlink.Link, error)
 
-// LPName creates a link provider that when called, will provide the link with
-// the given name (in the namespace this is called in). If no matches are
-// found, an error is returned.
+// LPName creates a link provider that when called, will provide the
+// pre-existing link with the given name (in the namespace this is called in).
+// If no matches are found, an error is returned.
 func LPName(name string) LinkProvider {
 	return func() (netlink.Link, error) {
 		return netlink.LinkByName(name)
 	}
 }
 
-// LPAlias creates a link provider that when called, will provide the link with
-// the given alias (in the namespace this is called in). If no matches are
-// found, an error is returned.
+// LPAlias creates a link provider that when called, will provide the
+// pre-existing link with the given alias (in the namespace this is called in).
+// If no matches are found, an error is returned.
 func LPAlias(alias string) LinkProvider {
 	return func() (netlink.Link, error) {
 		return netlink.LinkByAlias(alias)
 	}
 }
 
-// LPIndex creates a link provider that when called, will provide the link with
-// the given index (in the namespace this is called in). If no matches are
-// found, an error is returned.
+// LPIndex creates a link provider that when called, will provide the
+// pre-existing link with the given index (in the namespace this is called in).
+// If no matches are found, an error is returned.
 func LPIndex(index int) LinkProvider {
 	return func() (netlink.Link, error) {
 		return netlink.LinkByIndex(index)
@@ -61,6 +64,90 @@ func LPNewVeth(name, peerName string) LinkProvider {
 		}
 		veth.LinkAttrs.Name = name
 		if err := netlink.LinkAdd(&veth); err != nil {
+			return nil, err
+		}
+		return netlink.LinkByName(name)
+	}
+}
+
+// LPNewDummy creates a link provider that when called, will create a new dummy
+// link with the given name and returns it, provided no errors occur.
+func LPNewDummy(name string) LinkProvider {
+	return func() (netlink.Link, error) {
+		dummy := netlink.Dummy{
+			LinkAttrs: netlink.NewLinkAttrs(),
+		}
+		dummy.LinkAttrs.Name = name
+		if err := netlink.LinkAdd(&dummy); err != nil {
+			return nil, err
+		}
+		return netlink.LinkByName(name)
+	}
+}
+
+// LPNewGRETap creates a link provider that when called, creates a new gretap
+// device with the given name, local IP, and remoteIP.
+func LPNewGRETap(name, localIP, remoteIP string) LinkProvider {
+	return func() (netlink.Link, error) {
+		local := net.ParseIP(localIP)
+		if local == nil {
+			return nil, fmt.Errorf("failed to parse the local ip address of the gretap")
+		}
+		remote := net.ParseIP(remoteIP)
+		if remote == nil {
+			return nil, fmt.Errorf("failed to parse the remote ip address of the gretap")
+		}
+		gre := netlink.Gretap{
+			LinkAttrs: netlink.NewLinkAttrs(),
+			Local:     local,
+			Remote:    remote,
+		}
+		gre.LinkAttrs.Name = name
+		if err := netlink.LinkAdd(&gre); err != nil {
+			return nil, err
+		}
+		return netlink.LinkByName(name)
+	}
+}
+
+// LPNewWireguard creates a link provider that when called, will create a new
+// wireguard link with the given name and returns it, provided no errors occur.
+// Further setup of this link should be done in custom LinkDos withwireguard
+// specifc code.
+func LPNewWireguard(name string) LinkProvider {
+	return func() (netlink.Link, error) {
+		wg := netlink.Wireguard{
+			LinkAttrs: netlink.NewLinkAttrs(),
+		}
+		wg.LinkAttrs.Name = name
+		if err := netlink.LinkAdd(&wg); err != nil {
+			return nil, err
+		}
+		return netlink.LinkByName(name)
+	}
+}
+
+// LPNewVxlan creates a link provider that when called, will create a new
+// vxlan link with the given configuration and returns it.
+func LPNewVxlan(name, localIP, groupIP string, id, port int) LinkProvider {
+	return func() (netlink.Link, error) {
+		local := net.ParseIP(localIP)
+		if local == nil {
+			return nil, fmt.Errorf("failed to parse the local ip address of the vxlan")
+		}
+		group := net.ParseIP(groupIP)
+		if group == nil {
+			return nil, fmt.Errorf("failed to parse the group ip address of the vxlan")
+		}
+		vx := netlink.Vxlan{
+			LinkAttrs: netlink.NewLinkAttrs(),
+			VxlanId:   id,
+			SrcAddr:   local,
+			Group:     group,
+			Port:      port,
+		}
+		vx.LinkAttrs.Name = name
+		if err := netlink.LinkAdd(&vx); err != nil {
 			return nil, err
 		}
 		return netlink.LinkByName(name)
