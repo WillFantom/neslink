@@ -1,0 +1,15 @@
+{
+  "name": "neslink-dev",
+  "dockerFile": "Dockerfile",
+  "workspaceMount": "source=${localWorkspaceFolder}/,target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "privileged": true,
+  "extensions": [
+    "golang.go"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/willfantom/features/dotfiles:1": {}
+  },
+  "settings": {}
+}
