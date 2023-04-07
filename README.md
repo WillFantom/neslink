@@ -15,16 +15,16 @@ At the core of this package are the `Do` functions, one for network namespaces, 
 
 ### Namespace Interaction
 
-Any interaction with a netns should be done via a call to `NsDo`. As an example, to list the links in a network namespace, you would simply need to provide `NsDo` with a `NsProvider` for the target namespace, and the `NsAction` for listing links. So if there was a network namespace called `example`, then the following snippet would perform the action safely:
+Any interaction with a netns should be done via a call to `Do`. As an example, to list the links in a network namespace, you would simply need to provide `Do` with a `NsProvider` for the target namespace, and the `NsAction` for listing links. So if there was a network namespace called `example`, then the following snippet would perform the action safely:
 
 ```go
 links := make([]netlink.Link, 0)
-err := neslink.NsDo(neslink.NPName("example"), neslink.NALinks(&links))
+err := neslink.Do(neslink.NPName("example"), neslink.NALinks(&links))
 if err != nil {
   ...
 ```
 
-> 💡 Any number of `NSActions` can be provided to a single `NsDo` call, and they will be executed in order.
+> 💡 Any number of `NSActions` can be provided to a single `Do` call, and they will be executed in order.
 
 Here `err` would contain any error that occurred either in switching namespaces or within the function. If for any reason the system thread used for the action executing go routine fails to be returned to the netns of the caller, the thread is marked as dirty and can not be accessed again.
 
@@ -32,19 +32,19 @@ Custom `NsActions` can be easily created too, see [this example](./examples/nsac
 
 ### Link Interaction
 
-To manage links, any operation should be a `LinkAction` set in a call to `LinkDo`. Much like `NsDo`, `LinkDo` will execute a set of functions in a given netns, but applied to a specific link found via a `LinkProvider`. As an example, the below snippet will create a new bridge called _`br0`_ in a pre-existing named netns called _`example`_, then set its MAC address to _`12:23:34:45:56:67`_ and set its state to UP:
+To manage links, any operation should be a `LinkAction` set in a call to `Do`. `Do` will execute a set of functions in a given netns. As an example, the below snippet will create a new bridge called _`br0`_ in a pre-existing named netns called _`example`_, then set its MAC address to _`12:23:34:45:56:67`_ and set its state to UP:
 
 ```go
-if err := neslink.LinkDo(
+if err := neslink.Do(
   neslink.NPName("example"),
-  neslink.LPNewBridge("br0"),
-  neslink.LASetHw("12:23:34:45:56:67"),
-  neslink.LASetUp(),
+  neslink.LANewBridge("br0"),
+  neslink.LASetHw(neslink.LPName("br0"), "12:23:34:45:56:67"),
+  neslink.LASetUp(neslink.LPName("br0")),
   ); err != nil {
   ...
 ```
 
-> 📝 Setting a link's netns is not a `LinkAction` but instead a `NsAction`, since after moving the link to another netns, the netns of the LinkDo goroutine should also be changed to the netns to complete any further actions on the link.
+> 📝 Setting a link's netns is not a `LinkAction` but instead a `NsAction`, since after moving the link to another netns, the netns of the `Do` goroutine should also be changed to the netns to complete any further actions on the link.
 
 Via the `LinkProviders`, new links can be created, or already created links can be obtained via their name, index, or alias.
 
