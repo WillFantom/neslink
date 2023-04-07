@@ -6,6 +6,8 @@ import (
 	"runtime"
 )
 
+// TODO: Handle NsFd close errors in Do (currently as defers)
+
 var (
 	// errDirtyThread is returned when some action that moves a thread over to a
 	// netns fails to return the thread back to the netns of the caller. In the
@@ -15,13 +17,13 @@ var (
 	errDirtyThread error = errors.New("system thread failed to move to expected final network namespace")
 )
 
-// NsDo executes a given function in a specified network namespace. It does so
-// in a separate OS thread in order to allow the rest of the program to continue
-// on the current network namespace. An error is returned if any netns move
-// fails or any provided action fails. Do note that if the spawned system thread
-// fails to be reverted to the network namespace of the caller, the thread is
-// considered dirty and is never unlocked (thus can not be reused).
-func NsDo(nsP NsProvider, actions ...NsAction) error {
+// Do executes a given set of actions in a specified network namespace. It does
+// so in a separate OS thread in order to allow the rest of the program to
+// continue on the current network namespace. An error is returned if any netns
+// move fails or any provided action fails. Do note that if the spawned system
+// thread fails to be reverted to the network namespace of the caller, the
+// thread is considered dirty and is never unlocked (thus can not be reused).
+func Do(nsP NsProvider, actions ...Action) error {
 	// 1. get origin network namespace fd to revert back to
 	originNsFd, err := NPNow().Provide().open()
 	if err != nil {
@@ -41,7 +43,7 @@ func NsDo(nsP NsProvider, actions ...NsAction) error {
 	defer close(errChan)
 
 	// 4. create new go routine
-	go func(oNs, tNs NsFd, nsActions ...NsAction) {
+	go func(oNs, tNs NsFd, actions ...Action) {
 
 		// 1. lock os thread for goroutine
 		runtime.LockOSThread()
@@ -55,10 +57,10 @@ func NsDo(nsP NsProvider, actions ...NsAction) error {
 		// -?- thread now dirty - perpare for cleanup
 		errSet := errors.Join(nil)
 
-		// 3. exec ns actions
-		for idx, action := range nsActions {
+		// 3. exec actions
+		for idx, action := range actions {
 			if err := action.act(); err != nil {
-				errSet = errors.Join(errSet, fmt.Errorf("failed to perform ns action %d (%s)", idx+1, action.actionName), err)
+				errSet = errors.Join(errSet, fmt.Errorf("failed to perform action %d (%s)", idx+1, action.name()), err)
 				break
 			}
 		}
@@ -68,7 +70,7 @@ func NsDo(nsP NsProvider, actions ...NsAction) error {
 			errSet = errors.Join(errSet, fmt.Errorf("failed to switch to origin ns"), err, errDirtyThread)
 		}
 
-		// 5. if thread is dirty, dont unlock thread and sleep routine forever
+		// 5. if thread is dirty, don't unlock thread and sleep routine forever
 		if !errors.Is(errSet, errDirtyThread) {
 			runtime.UnlockOSThread()
 			errChan <- errSet
@@ -82,28 +84,6 @@ func NsDo(nsP NsProvider, actions ...NsAction) error {
 
 	// 5. get error from goroutine and return
 	return <-errChan
-
-}
-
-// LinkDo runs a set of link actions on a link that is obtained from the given
-// LinkProvider. The link provider is called and the actions are performed in
-// the namespace obtained by the NsProvider, thus this can be used to manage
-// links in any namespace. The actions are perfromed in the given namespace via
-// NsDo, so the returned outputs are much the same as with NsDo.
-func LinkDo(nsP NsProvider, lP LinkProvider, actions ...LinkAction) error {
-	function := func() error {
-		link, err := lP()
-		if err != nil {
-			return fmt.Errorf("failed to get link from provider: %w", err)
-		}
-		for idx, action := range actions {
-			if err := action.f(link); err != nil {
-				return fmt.Errorf("failed to perform action %d (%s): %w", idx+1, action.actionName, err)
-			}
-		}
-		return nil
-	}
-	return NsDo(nsP, NAGeneric("link-action-set", function))
 }
 
 func init() {
