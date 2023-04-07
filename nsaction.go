@@ -1,22 +1,43 @@
 package neslink
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path"
 
 	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 	"github.com/willfantom/nescript"
 	"github.com/willfantom/nescript/local"
+	"golang.org/x/sys/unix"
 )
 
 // NsAction represents an action that should be executed in a namespace via
 // NsDo. The action should have a relevant name as to give context to errors (as
 // multiple actions are executed in a single NsDo call). Also the action itself
 // should be a function that takes no parameters and returns an error (or nil in
-// the event of success).
+// the event of success). Also noteworthy, if an action function executes logic
+// in any other goroutines (either my channel interaction or spawning a new
+// goroutine), that logic will not be executed within the expected network
+// namespace.
 type NsAction struct {
 	actionName string
 	f          func() error
+}
+
+var (
+	// ReturnToOriginError is returned when some action that moves a thread over
+	// to a net ns fails to return the thread back to the netns of the caller. In
+	// the scenario where this happens, the os thread can be considered dirty and
+	// should not be reused. This error may also be wrapped into others, so
+	// errors.Is should be used to check for its presence.
+	ReturnToOriginError error = errors.New("failed to return to origin netns")
+)
+
+// act will execute the given action. This mainly exists to make the source code
+// for this package more readable.
+func (nsA NsAction) act() error {
+	return nsA.f()
 }
 
 // NAGeneric allows for a custom action (function) to be performed in a given
@@ -32,6 +53,48 @@ func NAGeneric(name string, function func() error) NsAction {
 	}
 }
 
+// NANewNsAt will create a new network namespace and bind it to a named file in
+// a given directory. Note that this will likey result in the netns not being
+// visible in the iproute command line. Any action that is perfomed after this
+// action executes successfully will be exectured within the new netns.
+func NANewNsAt(mountdir, name string) NsAction {
+	return NsAction{
+		actionName: "new-ns-at",
+		f: func() error {
+			// 1. create the mounting dir if required
+			if _, err := os.Stat(mountdir); os.IsNotExist(err) {
+				if err := os.MkdirAll(mountdir, 0o755); err != nil {
+					return err
+				}
+			}
+
+			// 2. create the mount file (error if already exists)
+			mountpath := path.Join(mountdir, name)
+			if _, err := os.Stat(mountpath); os.IsNotExist(err) {
+				mf, err := os.OpenFile(mountpath, os.O_CREATE|os.O_EXCL, 0o444)
+				if err != nil {
+					return fmt.Errorf("failed to create namespace mount file: %w", err)
+				}
+				mf.Close()
+			} else {
+				return fmt.Errorf("namespace mount file already exists")
+			}
+
+			// 3. create new ns and move current pid/tid to it
+			if err := unix.Unshare(unix.CLONE_NEWNET); err != nil {
+				return fmt.Errorf("failed to create and switch to newnets: %w", err)
+			}
+
+			// 4. bind the new ns to the mount file
+			if err := unix.Mount(NPNow().Provide().String(), mountpath, "bind", unix.MS_BIND, ""); err != nil {
+				return fmt.Errorf("failed to mount new netns to mount file: %w", err)
+			}
+
+			return nil
+		},
+	}
+}
+
 // NASetLinkNs moves a link provided by the given link provider to the namespace
 // provided by the ns provider. The link itself should br present in the
 // namespace in which the wrapping NsDo is set to execute in.
@@ -43,11 +106,11 @@ func NASetLinkNs(lP LinkProvider, nsP NsProvider) NsAction {
 			if err != nil {
 				return fmt.Errorf("failed to obtain link from provider: %w", err)
 			}
-			ns, err := nsP()
+			ns, err := nsP.Provide().open()
 			if err != nil {
-				return fmt.Errorf("failed to obtain target netns for link from provider: %w", err)
+				return fmt.Errorf("failed to open target netns for link from provider: %w", err)
 			}
-			defer ns.Close()
+			defer ns.close()
 			return netlink.LinkSetNsFd(link, int(ns))
 		},
 	}
@@ -60,7 +123,7 @@ func NAGetNsFd(nsfd *NsFd) NsAction {
 	return NsAction{
 		actionName: "get-ns-fd",
 		f: func() error {
-			fd, err := netns.Get()
+			fd, err := NPNow().f().open()
 			if err != nil {
 				return err
 			}
