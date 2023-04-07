@@ -1,7 +1,6 @@
 package neslink
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -24,15 +23,6 @@ type NsAction struct {
 	actionName string
 	f          func() error
 }
-
-var (
-	// ReturnToOriginError is returned when some action that moves a thread over
-	// to a net ns fails to return the thread back to the netns of the caller. In
-	// the scenario where this happens, the os thread can be considered dirty and
-	// should not be reused. This error may also be wrapped into others, so
-	// errors.Is should be used to check for its presence.
-	ReturnToOriginError error = errors.New("failed to return to origin netns")
-)
 
 // act will execute the given action. This mainly exists to make the source code
 // for this package more readable.
@@ -91,6 +81,18 @@ func NANewNsAt(mountdir, name string) NsAction {
 			}
 
 			return nil
+		},
+	}
+}
+
+// NANewNs will create a new network namespace and bind it to a named file. Any
+// action that is perfomed after this action executes successfully will be
+// exectured within the new netns.
+func NANewNs(name string) NsAction {
+	return NsAction{
+		actionName: "new-ns-at",
+		f: func() error {
+			return NANewNsAt(DefaultMountPath, name).act()
 		},
 	}
 }
