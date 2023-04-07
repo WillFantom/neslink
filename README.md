@@ -19,16 +19,14 @@ Any interaction with a netns should be done via a call to `NsDo`. As an example,
 
 ```go
 links := make([]netlink.Link, 0)
-err, ok := neslink.NsDo(neslink.NPName("example"), neslink.NALinks(&links))
-if err != nil || !ok {
+err := neslink.NsDo(neslink.NPName("example"), neslink.NALinks(&links))
+if err != nil {
   ...
 ```
 
 > 💡 Any number of `NSActions` can be provided to a single `NsDo` call, and they will be executed in order.
 
-Here `err` would contain any error that occurred either in switching namespaces or within the function. However, `ok` will only be true if the network namespace was successfully returned to the original netns prior to running the function.
-
-A new netns can be created similarly by specifying with the `NPNew()` or `NPNewNamed(...)` provider. The actions set can simply be left blank if you wish to only create the netns and not interact with it.
+Here `err` would contain any error that occurred either in switching namespaces or within the function. If for any reason the system thread used for the action executing go routine fails to be returned to the netns of the caller, the thread is marked as dirty and can not be accessed again.
 
 Custom `NsActions` can be easily created too, see [this example](./examples/nsactions).
 
@@ -37,12 +35,12 @@ Custom `NsActions` can be easily created too, see [this example](./examples/nsac
 To manage links, any operation should be a `LinkAction` set in a call to `LinkDo`. Much like `NsDo`, `LinkDo` will execute a set of functions in a given netns, but applied to a specific link found via a `LinkProvider`. As an example, the below snippet will create a new bridge called _`br0`_ in a pre-existing named netns called _`example`_, then set its MAC address to _`12:23:34:45:56:67`_ and set its state to UP:
 
 ```go
-if err, ok := neslink.LinkDo(
+if err := neslink.LinkDo(
   neslink.NPName("example"),
   neslink.LPNewBridge("br0"),
   neslink.LASetHw("12:23:34:45:56:67"),
   neslink.LASetUp(),
-  ); err != nil || !ok {
+  ); err != nil {
   ...
 ```
 
@@ -54,10 +52,6 @@ Via the `LinkProviders`, new links can be created, or already created links can 
 
 Using this package, [NEScripts](https://github.com/willfantom/nescript) can be executed on any specific netns, making it easy to specify custom actions to execute via the `NsAction` system.
 
-### Other Notes
-
- - Both `XXDo` functions have a `MustXXDo` variant that will still return errors, but if the function can not successfully revert to the original netns, will cause a panic.
-
 --- 
 
 ## Motivation
@@ -68,6 +62,5 @@ Whilst the 2 packages referenced at the top of this doc for netlink and netns pr
 
 ## 🚧 WIP
 
- - [ ] Address inline TODOs
  - [ ] Add tests
  - [ ] Run tests via actions
