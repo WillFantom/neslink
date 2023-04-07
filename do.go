@@ -25,14 +25,22 @@ var (
 // thread is considered dirty and is never unlocked (thus can not be reused).
 func Do(nsP NsProvider, actions ...Action) error {
 	// 1. get origin network namespace fd to revert back to
-	originNsFd, err := NPNow().Provide().open()
+	originNs, err := NPNow().Provide()
+	if err != nil {
+		return fmt.Errorf("failed to get origin netns: %w", err)
+	}
+	originNsFd, err := originNs.open()
 	if err != nil {
 		return fmt.Errorf("failed to open the origin netns file descriptor: %w", err)
 	}
 	defer originNsFd.close()
 
 	// 2. get new network namespace fd to switch to
-	targetNsFd, err := nsP.Provide().open()
+	targetNs, err := nsP.Provide()
+	if err != nil {
+		return fmt.Errorf("failed to get target netns: %w", err)
+	}
+	targetNsFd, err := targetNs.open()
 	if err != nil {
 		return fmt.Errorf("failed to open the target netns file descriptor: %w", err)
 	}

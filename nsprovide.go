@@ -13,7 +13,7 @@ import (
 // given conditions.
 type NsProvider struct {
 	name string
-	f    func() Namespace
+	f    func() (Namespace, error)
 }
 
 var (
@@ -25,8 +25,20 @@ var (
 // creation and others when this function is called, repeat calls are not always
 // expected to produce the same result. Also note, the path is only returned,
 // not opened.
-func (nsp NsProvider) Provide() Namespace {
+func (nsp NsProvider) Provide() (Namespace, error) {
 	return nsp.f()
+}
+
+// NPGeneric provides the means to create custom providers. See the docker
+// provider for an example of this.
+func NPGeneric(providerName string, function func() (Namespace, error)) NsProvider {
+	if providerName == "" {
+		providerName = "unnamed-ns-provider"
+	}
+	return NsProvider{
+		name: providerName,
+		f:    function,
+	}
 }
 
 // NPNow returns a netns provider that provides the netns path for the
@@ -34,8 +46,8 @@ func (nsp NsProvider) Provide() Namespace {
 func NPNow() NsProvider {
 	return NsProvider{
 		name: "now",
-		f: func() Namespace {
-			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid()))
+		f: func() (Namespace, error) {
+			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid())), nil
 		},
 	}
 }
@@ -45,8 +57,8 @@ func NPNow() NsProvider {
 func NPProcess(pid int) NsProvider {
 	return NsProvider{
 		name: "process",
-		f: func() Namespace {
-			return Namespace(fmt.Sprintf("/proc/%d/ns/net", pid))
+		f: func() (Namespace, error) {
+			return Namespace(fmt.Sprintf("/proc/%d/ns/net", pid)), nil
 		},
 	}
 }
@@ -56,8 +68,8 @@ func NPProcess(pid int) NsProvider {
 func NPThread(pid, tid int) NsProvider {
 	return NsProvider{
 		name: "thread",
-		f: func() Namespace {
-			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", pid, tid))
+		f: func() (Namespace, error) {
+			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", pid, tid)), nil
 		},
 	}
 }
@@ -67,8 +79,8 @@ func NPThread(pid, tid int) NsProvider {
 func NPName(name string) NsProvider {
 	return NsProvider{
 		name: "name",
-		f: func() Namespace {
-			return Namespace(path.Join(DefaultMountPath, name))
+		f: func() (Namespace, error) {
+			return Namespace(path.Join(DefaultMountPath, name)), nil
 		},
 	}
 }
@@ -78,8 +90,8 @@ func NPName(name string) NsProvider {
 func NPNameAt(mountdir, name string) NsProvider {
 	return NsProvider{
 		name: "name-at",
-		f: func() Namespace {
-			return Namespace(path.Join(mountdir, name))
+		f: func() (Namespace, error) {
+			return Namespace(path.Join(mountdir, name)), nil
 		},
 	}
 }
@@ -90,8 +102,8 @@ func NPPath(path string) NsProvider {
 	ns := Namespace(path)
 	return NsProvider{
 		name: "path",
-		f: func() Namespace {
-			return ns
+		f: func() (Namespace, error) {
+			return ns, nil
 		},
 	}
 }
