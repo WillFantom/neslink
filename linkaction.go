@@ -4,6 +4,7 @@ package neslink
 // TODO: Link actions for adding/deleting routes
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
@@ -19,7 +20,7 @@ import (
 // using LinkDo is still recommended.
 type LinkAction struct {
 	actionName string
-	f          func(netlink.Link) error
+	f          func() error
 }
 
 // ActionName returns the name associated with the given link action.
@@ -27,20 +28,19 @@ func (la LinkAction) ActionName() string {
 	return la.actionName
 }
 
-// Do will perform the link operation immediately, supporting use outide of any
-// LinkDo calls.
-func (la LinkAction) Do(link netlink.Link) error {
-	return la.f(link)
+// act will perform the link operation immediately.
+func (la LinkAction) act() error {
+	return la.f()
 }
 
 // LAGeneric allows for a custom LinkAction to be created and then used in a
 // LinkDo call.
-func LAGeneric(name string, function func(netlink.Link) error) LinkAction {
-	if name == "" {
-		name = "unnamed-link-action"
+func LAGeneric(actionName string, provider LinkProvider, function func() error) LinkAction {
+	if actionName == "" {
+		actionName = "unnamed-link-action"
 	}
 	return LinkAction{
-		actionName: name,
+		actionName: actionName,
 		f:          function,
 	}
 }
@@ -48,104 +48,144 @@ func LAGeneric(name string, function func(netlink.Link) error) LinkAction {
 // LADelete will simply delete the link when the action is executed. For obvious
 // reasons this should be at the end of any LinkDo call (since the link will be
 // deleted, further actions will error).
-func LADelete() LinkAction {
+func LADelete(provider LinkProvider) LinkAction {
 	return LinkAction{
 		actionName: "delete-link",
-		f: func(l netlink.Link) error {
-			return netlink.LinkDel(l)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.LinkDel(l)
+			}
 		},
 	}
 }
 
-func LASetName(name string) LinkAction {
+func LASetName(provider LinkProvider, name string) LinkAction {
 	return LinkAction{
 		actionName: "set-name",
-		f: func(l netlink.Link) error {
-			return netlink.LinkSetName(l, name)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.LinkSetName(l, name)
+			}
 		},
 	}
 }
 
-func LASetAlias(alias string) LinkAction {
+func LASetAlias(provider LinkProvider, alias string) LinkAction {
 	return LinkAction{
 		actionName: "set-alias",
-		f: func(l netlink.Link) error {
-			return netlink.LinkSetAlias(l, alias)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.LinkSetAlias(l, alias)
+			}
 		},
 	}
 }
 
-func LASetHw(addr string) LinkAction {
+func LASetHw(provider LinkProvider, addr string) LinkAction {
 	return LinkAction{
 		actionName: "set-hw",
-		f: func(l netlink.Link) error {
-			hwAddr, err := net.ParseMAC(addr)
-			if err != nil {
-				return err
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				hwAddr, err := net.ParseMAC(addr)
+				if err != nil {
+					return err
+				}
+				return netlink.LinkSetHardwareAddr(l, hwAddr)
 			}
-			return netlink.LinkSetHardwareAddr(l, hwAddr)
 		},
 	}
 }
 
-func LASetUp() LinkAction {
+func LASetUp(provider LinkProvider) LinkAction {
 	return LinkAction{
 		actionName: "set-state-up",
-		f: func(l netlink.Link) error {
-			return netlink.LinkSetUp(l)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.LinkSetUp(l)
+			}
 		},
 	}
 }
 
-func LASetDown() LinkAction {
+func LASetDown(provider LinkProvider) LinkAction {
 	return LinkAction{
 		actionName: "set-state-down",
-		f: func(l netlink.Link) error {
-			return netlink.LinkSetDown(l)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.LinkSetDown(l)
+			}
 		},
 	}
 }
 
-func LASetPromiscOn() LinkAction {
+func LASetPromiscOn(provider LinkProvider) LinkAction {
 	return LinkAction{
 		actionName: "set-promisc-on",
-		f: func(l netlink.Link) error {
-			return netlink.SetPromiscOn(l)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.SetPromiscOn(l)
+			}
 		},
 	}
 }
 
-func LASetPromiscOff() LinkAction {
+func LASetPromiscOff(provider LinkProvider) LinkAction {
 	return LinkAction{
 		actionName: "set-promisc-off",
-		f: func(l netlink.Link) error {
-			return netlink.SetPromiscOff(l)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				return netlink.SetPromiscOff(l)
+			}
 		},
 	}
 }
 
-func LAAddAddr(cidr string) LinkAction {
+func LAAddAddr(provider LinkProvider, cidr string) LinkAction {
 	return LinkAction{
 		actionName: "add-address",
-		f: func(l netlink.Link) error {
-			addr, err := netlink.ParseAddr(cidr)
-			if err != nil {
-				return fmt.Errorf("failed to parse cidr to network address: %w", err)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				addr, err := netlink.ParseAddr(cidr)
+				if err != nil {
+					return fmt.Errorf("failed to parse cidr to network address: %w", err)
+				}
+				return netlink.AddrAdd(l, addr)
 			}
-			return netlink.AddrAdd(l, addr)
 		},
 	}
 }
 
-func LADelAddr(cidr string) LinkAction {
+func LADelAddr(provider LinkProvider, cidr string) LinkAction {
 	return LinkAction{
 		actionName: "del-address",
-		f: func(l netlink.Link) error {
-			addr, err := netlink.ParseAddr(cidr)
-			if err != nil {
-				return fmt.Errorf("failed to parse cidr to network address: %w", err)
+		f: func() error {
+			if l, err := provider.Provide(); err != nil {
+				return errors.Join(errNoLink, err)
+			} else {
+				addr, err := netlink.ParseAddr(cidr)
+				if err != nil {
+					return fmt.Errorf("failed to parse cidr to network address: %w", err)
+				}
+				return netlink.AddrDel(l, addr)
 			}
-			return netlink.AddrDel(l, addr)
 		},
 	}
 }
