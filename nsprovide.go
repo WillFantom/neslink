@@ -24,24 +24,11 @@ func (nsp NsProvider) Provide() Namespace {
 	return nsp.f()
 }
 
-// NPCreated returns a netns provider that simply provides the netns path that
-// was found at the time that the provider itself was created (the time that
-// this function is called).
-func NPCreated() NsProvider {
-	ns := Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid()))
-	return NsProvider{
-		name: "created",
-		f: func() Namespace {
-			return ns
-		},
-	}
-}
-
-// NPExecuted returns a netns provider that provides the netns path for the
+// NPNow returns a netns provider that provides the netns path for the
 // process/thread that calls the Provide function.
-func NPExecuted() NsProvider {
+func NPNow() NsProvider {
 	return NsProvider{
-		name: "executed",
+		name: "now",
 		f: func() Namespace {
 			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid()))
 		},
