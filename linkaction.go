@@ -28,6 +28,11 @@ func (la LinkAction) ActionName() string {
 	return la.actionName
 }
 
+// name simply returns the name of the link action.
+func (la LinkAction) name() string {
+	return la.actionName
+}
+
 // act will perform the link operation immediately.
 func (la LinkAction) act() error {
 	return la.f()
@@ -42,6 +47,117 @@ func LAGeneric(actionName string, provider LinkProvider, function func() error) 
 	return LinkAction{
 		actionName: actionName,
 		f:          function,
+	}
+}
+
+// LANewBridge creates a new bridge with the given name.
+func LANewBridge(name string) LinkAction {
+	return LinkAction{
+		actionName: "new-bridge",
+		f: func() error {
+			bridge := netlink.Bridge{
+				LinkAttrs: netlink.NewLinkAttrs(),
+			}
+			bridge.LinkAttrs.Name = name
+			return netlink.LinkAdd(&bridge)
+		},
+	}
+}
+
+// LANewVeth will create a new veth pair. The names for both the new interfaces
+// (main link and peer) should be provided.
+func LANewVeth(name, peerName string) LinkAction {
+	return LinkAction{
+		actionName: "new-veth",
+		f: func() error {
+			veth := netlink.Veth{
+				LinkAttrs: netlink.NewLinkAttrs(),
+				PeerName:  peerName,
+			}
+			veth.LinkAttrs.Name = name
+			return netlink.LinkAdd(&veth)
+		},
+	}
+}
+
+// LANewDummy creates a new dummy link with the given name.
+func LANewDummy(name string) LinkAction {
+	return LinkAction{
+		actionName: "new-dummy",
+		f: func() error {
+			dummy := netlink.Dummy{
+				LinkAttrs: netlink.NewLinkAttrs(),
+			}
+			dummy.LinkAttrs.Name = name
+			return netlink.LinkAdd(&dummy)
+		},
+	}
+}
+
+// LANewGRETap creates a new gretap device with the given name, local IP, and
+// remoteIP.
+func LANewGRETap(name, localIP, remoteIP string) LinkAction {
+	return LinkAction{
+		actionName: "new-gretap",
+		f: func() error {
+			local := net.ParseIP(localIP)
+			if local == nil {
+				return fmt.Errorf("failed to parse the local ip address of the gretap")
+			}
+			remote := net.ParseIP(remoteIP)
+			if remote == nil {
+				return fmt.Errorf("failed to parse the remote ip address of the gretap")
+			}
+			gre := netlink.Gretap{
+				LinkAttrs: netlink.NewLinkAttrs(),
+				Local:     local,
+				Remote:    remote,
+			}
+			gre.LinkAttrs.Name = name
+			return netlink.LinkAdd(&gre)
+		},
+	}
+}
+
+// LANewWireguard creates a new wireguard link with the given name. Further
+// setup of this link should be done in custom LinkActions with wireguard
+// specifc code.
+func LANewWireguard(name string) LinkAction {
+	return LinkAction{
+		actionName: "new-wireguard",
+		f: func() error {
+			wg := netlink.Wireguard{
+				LinkAttrs: netlink.NewLinkAttrs(),
+			}
+			wg.LinkAttrs.Name = name
+			return netlink.LinkAdd(&wg)
+		},
+	}
+}
+
+// LANewVxlan creates a new vxlan link with the given configuration.
+func LANewVxlan(name, localIP, groupIP string, id, port int) LinkAction {
+	return LinkAction{
+		actionName: "new-vxlan",
+		f: func() error {
+			local := net.ParseIP(localIP)
+			if local == nil {
+				return fmt.Errorf("failed to parse the local ip address of the vxlan")
+			}
+			group := net.ParseIP(groupIP)
+			if group == nil {
+				return fmt.Errorf("failed to parse the group ip address of the vxlan")
+			}
+			vx := netlink.Vxlan{
+				LinkAttrs: netlink.NewLinkAttrs(),
+				VxlanId:   id,
+				SrcAddr:   local,
+				Group:     group,
+				Port:      port,
+			}
+			vx.LinkAttrs.Name = name
+			return netlink.LinkAdd(&vx)
+		},
 	}
 }
 
