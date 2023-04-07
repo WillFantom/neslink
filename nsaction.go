@@ -1,6 +1,7 @@
 package neslink
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -104,9 +105,9 @@ func NASetLinkNs(lP LinkProvider, nsP NsProvider) NsAction {
 	return NsAction{
 		actionName: "set-link-ns",
 		f: func() error {
-			link, err := lP()
+			link, err := lP.Provide()
 			if err != nil {
-				return fmt.Errorf("failed to obtain link from provider: %w", err)
+				return errors.Join(errNoLink, err)
 			}
 			ns, err := nsP.Provide().open()
 			if err != nil {
@@ -178,7 +179,7 @@ func NAGetLink(provider LinkProvider, link *netlink.Link) NsAction {
 	return NsAction{
 		actionName: "get-ns-link",
 		f: func() error {
-			l, err := provider()
+			l, err := provider.Provide()
 			if err != nil {
 				return err
 			}

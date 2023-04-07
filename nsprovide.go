@@ -1,6 +1,7 @@
 package neslink
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -14,6 +15,10 @@ type NsProvider struct {
 	name string
 	f    func() Namespace
 }
+
+var (
+	errNoNs error = errors.New("failed to obtain netns from provider")
+)
 
 // Provide determines the network namespace path based on the provider's
 // conditions. Since some conditions are collected at the time of the provider's
