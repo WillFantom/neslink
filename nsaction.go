@@ -50,9 +50,9 @@ func NAGeneric(name string, function func() error) NsAction {
 }
 
 // NANewNsAt will create a new network namespace and bind it to a named file in
-// a given directory. Note that this will likey result in the netns not being
-// visible in the iproute command line. Any action that is perfomed after this
-// action executes successfully will be exectured within the new netns.
+// a given directory. Note that this will likely result in the netns not being
+// visible in the iproute command line. Any action that is performed after this
+// action executes successfully will be executed within the new netns.
 func NANewNsAt(mountdir, name string) NsAction {
 	return NsAction{
 		actionName: "new-ns-at",
@@ -92,8 +92,8 @@ func NANewNsAt(mountdir, name string) NsAction {
 }
 
 // NANewNs will create a new network namespace and bind it to a named file. Any
-// action that is perfomed after this action executes successfully will be
-// exectured within the new netns.
+// action that is performed after this action executes successfully will be
+// executed within the new netns.
 func NANewNs(name string) NsAction {
 	return NsAction{
 		actionName: "new-ns-at",
@@ -160,7 +160,7 @@ func NAExecNescript(script nescript.Script, subcommand []string, process *nescri
 	}
 }
 
-// ListLinks returns a list of all the links in the namespace obtained via the
+// NALinks returns a list of all the links in the namespace obtained via the
 // given provider. Any errors are returned and a boolean to express if the the
 // network namespace has returned back to the origin successfully.
 func NALinks(links *[]netlink.Link) NsAction {
@@ -173,6 +173,37 @@ func NALinks(links *[]netlink.Link) NsAction {
 			}
 			*links = l
 			return nil
+		},
+	}
+}
+
+// NADeleteNamedAt when executed removes the named netns if it exists.
+// Importantly, the netns is not removed until the tread exists (at the end of
+// the do call).
+func NADeleteNamedAt(mountdir, name string) NsAction {
+	return NsAction{
+		actionName: "delete-named-ns-at",
+		f: func() error {
+			mountpath := path.Join(mountdir, name)
+			if err := unix.Unmount(mountpath, unix.MNT_DETACH); err != nil {
+				return fmt.Errorf("failed to unmount netns: %w", err)
+			}
+			if err := os.Remove(mountpath); err != nil {
+				return fmt.Errorf("failed to remove netns mount file: %w", err)
+			}
+			return nil
+		},
+	}
+}
+
+// NADeleteNamed when executed removes the named netns if it exists.
+// Importantly, the netns is not removed until the tread exists (at the end of
+// the do call).
+func NADeleteNamed(name string) NsAction {
+	return NsAction{
+		actionName: "delete-named-ns-at",
+		f: func() error {
+			return NADeleteNamedAt(DefaultMountPath, name).act()
 		},
 	}
 }
