@@ -25,6 +25,11 @@ type NsAction struct {
 	f          func() error
 }
 
+// name simply returns the name of the netns action.
+func (nsA NsAction) name() string {
+	return nsA.actionName
+}
+
 // act will execute the given action. This mainly exists to make the source code
 // for this package more readable.
 func (nsA NsAction) act() error {
