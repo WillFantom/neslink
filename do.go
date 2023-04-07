@@ -105,3 +105,7 @@ func LinkDo(nsP NsProvider, lP LinkProvider, actions ...LinkAction) error {
 	}
 	return NsDo(nsP, NAGeneric("link-action-set", function))
 }
+
+func init() {
+	runtime.LockOSThread()
+}
