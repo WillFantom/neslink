@@ -82,7 +82,8 @@ func NANewNsAt(mountdir, name string) NsAction {
 			}
 
 			// 4. bind the new ns to the mount file
-			if err := unix.Mount(NPNow().Provide().String(), mountpath, "bind", unix.MS_BIND, ""); err != nil {
+			ns, _ := NPNow().Provide()
+			if err := unix.Mount(ns.String(), mountpath, "bind", unix.MS_BIND, ""); err != nil {
 				return fmt.Errorf("failed to mount new netns to mount file: %w", err)
 			}
 
@@ -114,12 +115,16 @@ func NASetLinkNs(lP LinkProvider, nsP NsProvider) NsAction {
 			if err != nil {
 				return errors.Join(errNoLink, err)
 			}
-			ns, err := nsP.Provide().open()
+			ns, err := nsP.Provide()
+			if err != nil {
+				return fmt.Errorf("failed to get target netns for link from provider: %w", err)
+			}
+			nsfd, err := ns.open()
 			if err != nil {
 				return fmt.Errorf("failed to open target netns for link from provider: %w", err)
 			}
-			defer ns.close()
-			return netlink.LinkSetNsFd(link, int(ns))
+			defer nsfd.close()
+			return netlink.LinkSetNsFd(link, nsfd.Int())
 		},
 	}
 }
@@ -131,7 +136,11 @@ func NAGetNsFd(nsfd *NsFd) NsAction {
 	return NsAction{
 		actionName: "get-ns-fd",
 		f: func() error {
-			fd, err := NPNow().f().open()
+			ns, err := NPNow().Provide()
+			if err != nil {
+				return fmt.Errorf("failed to get netns from provider: %w", err)
+			}
+			fd, err := ns.open()
 			if err != nil {
 				return err
 			}
