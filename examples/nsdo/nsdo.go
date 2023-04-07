@@ -11,13 +11,11 @@ func main() {
 	// 1. create an empty links slice to store the result in
 	links := make([]netlink.Link, 0)
 
-	// 2. call nsdo with a provider (in this case will be a new unnamed netns) and
+	// 2. call do with a provider (in this case will be a new unnamed netns) and
 	// the Links action
-	err, ok := neslink.NsDo(neslink.NPNew(), neslink.NALinks(&links))
+	err := neslink.Do(neslink.NPNow(), neslink.NANewNs("example"), neslink.NALinks(&links), neslink.NADeleteNamed("example"))
 	if err != nil {
 		panic(err)
-	} else if !ok {
-		panic(fmt.Errorf("failed to return to origin namespace"))
 	}
 
 	// 3. dump the links that were found (since its a new netns, should just be
