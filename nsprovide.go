@@ -1,90 +1,105 @@
 package neslink
 
-import "github.com/vishvananda/netns"
+import (
+	"fmt"
+	"os"
+	"path"
 
-// NsProvider is a function that retruns a network namespace (netns) handle
-// (file descriptor) when it is called. If the provider fails to correctly
-// obtain the netns, an error is returned.
-type NsProvider func() (NsFd, error)
+	"golang.org/x/sys/unix"
+)
 
-// NPNow returns a netns provider that simply provides the netns fd that was
-// found at the time that the provider itself was generated (the time that this
-// function is called).
-func NPNow() NsProvider {
-	ns, err := netns.Get()
-	return func() (NsFd, error) {
-		return NsFd(ns), err
+// NsProvider offers a approach to obtaining network namespace paths based on
+// given conditions.
+type NsProvider struct {
+	name string
+	f    func() Namespace
+}
+
+// Provide determines the network namespace path based on the provider's
+// conditions. Since some conditions are collected at the time of the provider's
+// creation and others when this function is called, repeat calls are not always
+// expected to produce the same result. Also note, the path is only returned,
+// not opened.
+func (nsp NsProvider) Provide() Namespace {
+	return nsp.f()
+}
+
+// NPCreated returns a netns provider that simply provides the netns path that
+// was found at the time that the provider itself was created (the time that
+// this function is called).
+func NPCreated() NsProvider {
+	ns := Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid()))
+	return NsProvider{
+		name: "created",
+		f: func() Namespace {
+			return ns
+		},
 	}
 }
 
-// NPCurrent returns a netns provider that will return the current netns fd as
-// of the time when the provider itself is called.
-func NPCurrent() NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.Get()
-		return NsFd(ns), err
+// NPExecuted returns a netns provider that provides the netns path for the
+// process/thread that calls the Provide function.
+func NPExecuted() NsProvider {
+	return NsProvider{
+		name: "executed",
+		f: func() Namespace {
+			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid()))
+		},
 	}
 }
 
-// NPName returns a netns provider that when called will return the netns fd
-// associated with the given name.
-func NPName(name string) NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.GetFromName(name)
-		return NsFd(ns), err
-	}
-}
-
-// NPDocker returns a netns provider that when called will return the netns fd
-// associated with a given docker container.
-func NPDocker(containerID string) NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.GetFromDocker(containerID)
-		return NsFd(ns), err
-	}
-}
-
-// NPPath returns a netns provider that when called will return the netns fd
-// associated with the given file path.
-func NPPath(path string) NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.GetFromPath(path)
-		return NsFd(ns), err
-	}
-}
-
-// NPProcess returns a netns provider that when called will return the netns fd
-// associated with the given process.
+// NPProcess returns a netns provider that provides the netns path for the
+// process associated with the given process ID.
 func NPProcess(pid int) NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.GetFromPid(pid)
-		return NsFd(ns), err
+	return NsProvider{
+		name: "process",
+		f: func() Namespace {
+			return Namespace(fmt.Sprintf("/proc/%d/ns/net", pid))
+		},
 	}
 }
 
-// NPThread returns a netns provider that when called will return the netns fd
-// associated with the given thread.
+// NPThread returns a netns provider that provides the netns path for the
+// process associated with the given process and thread ID.
 func NPThread(pid, tid int) NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.GetFromThread(pid, tid)
-		return NsFd(ns), err
+	return NsProvider{
+		name: "thread",
+		f: func() Namespace {
+			return Namespace(fmt.Sprintf("/proc/%d/task/%d/ns/net", pid, tid))
+		},
 	}
 }
 
-// NPNew returns a netns provider that when called will create a new unnamed
-// netns (in turn switching to it) and returns the fd of the newly created ns.
-func NPNew() NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.New()
-		return NsFd(ns), err
+// NPName returns a netns provider that provides the netns path for a named
+// (mounted) netns. This assumes the ns is mounted in the default location.
+func NPName(name string) NsProvider {
+	return NsProvider{
+		name: "name",
+		f: func() Namespace {
+			return Namespace(path.Join(DefaultMountPath, name))
+		},
 	}
 }
 
-// NPNewNamed returns a netns provider that when called will create a new named
-// netns (in turn switching to it) and returns the fd of the newly created ns.
-func NPNewNamed(name string) NsProvider {
-	return func() (NsFd, error) {
-		ns, err := netns.NewNamed(name)
-		return NsFd(ns), err
+// NPNameAt returns a netns provider that provides the netns path for a named
+// (mounted) netns.
+func NPNameAt(mountdir, name string) NsProvider {
+	return NsProvider{
+		name: "name-at",
+		f: func() Namespace {
+			return Namespace(path.Join(mountdir, name))
+		},
+	}
+}
+
+// NPPath returns a netns provider that provides the netns path based on the
+// path given.
+func NPPath(path string) NsProvider {
+	ns := Namespace(path)
+	return NsProvider{
+		name: "path",
+		f: func() Namespace {
+			return ns
+		},
 	}
 }
